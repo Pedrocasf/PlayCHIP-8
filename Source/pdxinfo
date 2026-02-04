@@ -1,5 +1,5 @@
-name=Chip8
+name=play_chip_8
 author=Pedro Starling
 description=Chip-8 emulator in C
-bundleID=com.pedrocasf
+bundleID=com.pedro.casf
 imagePath=

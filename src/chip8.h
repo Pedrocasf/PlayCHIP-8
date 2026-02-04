@@ -7,8 +7,8 @@ typedef struct Chip8{
     uint8_t mem[4096];
     uint16_t stack[16];
     uint8_t sp;
-    uint8_t d;
-    uint8_t s;
+    uint8_t dt;
+    uint8_t st;
     uint16_t pc;
     uint16_t i;
     uint8_t disp[256];
