@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "chip8.h"
+#include "chip8_jit.h"
 #include "pd_api.h"
 
 static int update(void* userdata);
@@ -28,7 +28,7 @@ int eventHandler(PlaydateAPI* pd, PDSystemEvent event, uint32_t arg)
 		bitmap =  pd->graphics->newBitmap(64,32,kColorBlack);
 	    //pd->file->mkdir("/ROMS");
 		pd->system->setUpdateCallback(update, pd);
-		pd->display->setScale(8);
+		pd->display->setScale(4);
 
 	}
 
@@ -53,9 +53,9 @@ static int update(void* userdata)
 	    uint8_t* bitmapData;
 	    pd->graphics->getBitmapData(bitmap, 0, 0,&rowBytes, NULL,  &bitmapData);
 		memcpy(bitmapData, VM_state->disp, 256);
-		pd->graphics->drawBitmap(bitmap,0,0,0);
+		pd->graphics->drawBitmap(bitmap,32,0,0);
 	}
-	//pd->system->drawFPS(0,0);
+	pd->system->drawFPS(0,0);
 
 	return 1;
 }

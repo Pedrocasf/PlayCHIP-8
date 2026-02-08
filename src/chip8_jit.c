@@ -1,9 +1,12 @@
-#include "chip8.h"
+#include "chip8_jit.h"
 #include "roms/corax.h"
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+void translate(Chip8**vm, PlaydateAPI* pd){
+
+}
 void init_from_file(char* file, Chip8**vm, PlaydateAPI* pd){
     uint8_t font[80] = {
         0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -54,6 +57,7 @@ void init_from_header(Chip8**vm, PlaydateAPI* pd){
     *vm = (Chip8*)pd->system->realloc(NULL, sizeof(Chip8));
     memcpy((*vm)->mem,font,80);
     memcpy((*vm)->mem+0x200, CORAX, 761);
+    (*vm)->instrs = (Instruction*)pd->system->realloc(NULL, 2048 * sizeof(Instruction));
     (*vm)->pc = 0x200;
 }
 bool draw(Chip8*vm, uint8_t x, uint8_t y, uint8_t n, uint8_t* spr){
@@ -88,10 +92,12 @@ void exec_op(Chip8*vm, uint16_t op, PlaydateAPI* pd){
         switch (kk) {
             case 0xE0:
                 memset(vm->fb, 0, 2048);
+                vm->instrs[vm->pc].instr = CLS;
                 pd->system->logToConsole("CLS addr:%x", vm->pc);
             break;
             case 0xEE:
                 vm->sp -= 1;
+                vm->instrs[vm->pc].instr = RET;
                 vm->pc = vm->stack[vm->sp];
                 pd->system->logToConsole("RET addr:%x", vm->pc);
             break;
@@ -102,77 +108,121 @@ void exec_op(Chip8*vm, uint16_t op, PlaydateAPI* pd){
         break;
         case 0x1:
             pd->system->logToConsole("JMP target %x at addr:%x", nnn,vm->pc);
+            vm->instrs[vm->pc].instr = JMP;
+            vm->instrs[vm->pc].ops.nnn = nnn;
             vm->pc = nnn;
         break;
         case 0x2:
             pd->system->logToConsole("CALL target %x at addr:%x", nnn,vm->pc);
             vm->stack[vm->sp] = vm->pc;
             vm->sp++;
+            vm->instrs[vm->pc].instr = CALL;
+            vm->instrs[vm->pc].ops.nnn = nnn;
             vm->pc = nnn;
         break;
         case 0x3:
+            vm->instrs[vm->pc].instr = SEKK;
+            vm->instrs[vm->pc].ops.xyz.x = x;
+            vm->instrs[vm->pc].ops.xyz.y = kk;
             if(vx == kk)
                 vm->pc+=2;
             pd->system->logToConsole("SEKK addr:%x", vm->pc);
         break;
         case 0x4:
+            vm->instrs[vm->pc].instr = SNEKK;
+            vm->instrs[vm->pc].ops.xyz.x = x;
+            vm->instrs[vm->pc].ops.xyz.y = kk;
             if(vx != kk)
                 vm->pc+=2;
             pd->system->logToConsole("SNEKK addr:%x", vm->pc);
         break;
         case 0x5:
-        if (vx == vy)
-            vm->pc+=2;
+            vm->instrs[vm->pc].instr = SE;
+            vm->instrs[vm->pc].ops.xyz.x = x;
+            vm->instrs[vm->pc].ops.xyz.y = y;
+            if (vx == vy)
+                vm->pc+=2;
             pd->system->logToConsole("SE addr:%x", vm->pc);
         break;
         case 0x6:
+            vm->instrs[vm->pc].instr = LDXK;
+            vm->instrs[vm->pc].ops.xyz.x = x;
+            vm->instrs[vm->pc].ops.xyz.y = kk;
             vm->v[x] = kk;
             pd->system->logToConsole("LDXK at addr:%x",vm->pc);
         break;
         case 0x7:
+            vm->instrs[vm->pc].instr = ADDXK;
+            vm->instrs[vm->pc].ops.xyz.x = x;
+            vm->instrs[vm->pc].ops.xyz.y = kk;
             vm->v[x] += kk;
             pd->system->logToConsole("ADDXK at addr:%x",vm->pc);
         break;
         case 0x8:
             switch (op3) {
                 case 0x0:
+                    vm->instrs[vm->pc].instr = LDXY;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
+                    vm->instrs[vm->pc].ops.xyz.y = y;
                     vm->v[x] = vy;
                     pd->system->logToConsole("LDXY at addr:%x",vm->pc);
                 break;
                 case 0x1:
+                    vm->instrs[vm->pc].instr = ORXY;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
+                    vm->instrs[vm->pc].ops.xyz.y = y;
                     vm->v[x] = vx | vy;
                     pd->system->logToConsole("ORXY at addr:%x",vm->pc);
                 break;
                 case 0x2:
+                    vm->instrs[vm->pc].instr = ANDXY;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
+                    vm->instrs[vm->pc].ops.xyz.y = y;
                     vm->v[x] = vx & vy;
                     pd->system->logToConsole("ANDXY at addr:%x",vm->pc);
                 break;
                 case 0x3:
+                    vm->instrs[vm->pc].instr = XORXY;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
+                    vm->instrs[vm->pc].ops.xyz.y = y;
                     vm->v[x] = vx ^ vy;
                     pd->system->logToConsole("XORXY at addr:%x",vm->pc);
                 break;
                 case 0x4:
+                    vm->instrs[vm->pc].instr = ADDXY;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
+                    vm->instrs[vm->pc].ops.xyz.y = y;
                     uint16_t r = vx + vy;
                     vm->v[0xF] = r > 255;
                     vm->v[x] = r & 0xFF;
                     pd->system->logToConsole("ADDXY at addr:%x",vm->pc);
                 break;
                 case 0x5:
+                    vm->instrs[vm->pc].instr = SUBXY;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
+                    vm->instrs[vm->pc].ops.xyz.y = y;
                     vm->v[0xF] = vx > vy;
                     vm->v[x] = vx - vy;
                     pd->system->logToConsole("SUBXY at addr:%x",vm->pc);
                 break;
                 case 0x6:
+                    vm->instrs[vm->pc].instr = SHRX;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
                     vm->v[0xf] = vx & 0x01;
                     vm->v[x] = vx >> 1;
                     pd->system->logToConsole("SHRX at addr:%x",vm->pc);
                 break;
                 case 0x7:
+                    vm->instrs[vm->pc].instr = SUBNXY;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
+                    vm->instrs[vm->pc].ops.xyz.y = y;
                     vm->v[0xF] = vy > vx;
                     vm->v[x] = vy - vx;
                     pd->system->logToConsole("SUBNXY at addr:%x",vm->pc);
                 break;
                 case 0xE:
+                    vm->instrs[vm->pc].instr = SHLX;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
                     vm->v[0xF] = (vx & 0x80) == 0x80;
                     vm->v[x] = vx << 1;
                     pd->system->logToConsole("SHLX at addr:%x",vm->pc);
@@ -183,34 +233,50 @@ void exec_op(Chip8*vm, uint16_t op, PlaydateAPI* pd){
             }
         break;
         case 0x9:
-        if (vx != vy)
-            vm->pc+=2;
-            pd->system->logToConsole("SNE addr:%x", vm->pc);
+            vm->instrs[vm->pc].instr = SNE;
+            vm->instrs[vm->pc].ops.xyz.x = x;
+            vm->instrs[vm->pc].ops.xyz.y = y;
+            if (vx != vy)
+                vm->pc+=2;
+                pd->system->logToConsole("SNE addr:%x", vm->pc);
         break;
         case 0xA:
+            vm->instrs[vm->pc].instr = LDI;
+            vm->instrs[vm->pc].ops.nnn = nnn;
             vm->i = nnn;
             pd->system->logToConsole("LDI at addr:%x",vm->pc);
         break;
         case 0xB:
-            vm->pc = (nnn + vm->v[0]) & 0x0FFF;
+            vm->instrs[vm->pc].instr = JPV0;
+            vm->instrs[vm->pc].ops.nnn = nnn;
             pd->system->logToConsole("JPV0 addr:%x", vm->pc);
+            vm->pc = (nnn + vm->v[0]) & 0x0FFF;
         break;
         case 0xC:
+            vm->instrs[vm->pc].instr = RNDX;
+            vm->instrs[vm->pc].ops.xyz.x = x;
+            vm->instrs[vm->pc].ops.xyz.y = kk;
             uint8_t r = rand() & kk;
             vm->v[x] = r;
             pd->system->logToConsole("RNDX at addr:%x",vm->pc);
         break;
         case 0xD:
+            vm->instrs[vm->pc].instr = DRAW;
+            vm->instrs[vm->pc].ops.xyz.x = x;
+            vm->instrs[vm->pc].ops.xyz.y = y;
+            vm->instrs[vm->pc].ops.xyz.z = n;
             vm->v[0xF] = draw(vm, vx, vy, n, &vm->mem[vm->i]);
             pd->system->logToConsole("DRW at addr:%x",vm->pc);
         break;
         case 0xE:
             switch (kk) {
                 case 0x9E:
+                    vm->instrs[vm->pc].instr = SKP;
                     vm->pc += 2;
                     pd->system->logToConsole("SKP addr:%x", vm->pc);
                 break;
                 case 0xA1:
+                    vm->instrs[vm->pc].instr = SKNP;
                     vm->pc += 2;
                     pd->system->logToConsole("SKNP at addr:%x",vm->pc);
                 break;
@@ -222,30 +288,44 @@ void exec_op(Chip8*vm, uint16_t op, PlaydateAPI* pd){
         case 0xF:
             switch (kk) {
                 case 0x07:
+                    vm->instrs[vm->pc].instr = LDXDT;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
                     vm->v[x] = vm->dt;
                     pd->system->logToConsole("LDXDT at addr:%x",vm->pc);
                 break;
                 case 0x0A:
+                    vm->instrs[vm->pc].instr = LDXKK;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
                     vm->v[x] = 0;
                     pd->system->logToConsole("LDXKK addr:%x", vm->pc);
                 break;
                 case 0x15:
+                    vm->instrs[vm->pc].instr = LDDTX;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
                     vm->dt = vx;
                     pd->system->logToConsole("LDDTX at addr:%x",vm->pc);
                 break;
                 case 0x18:
+                    vm->instrs[vm->pc].instr = LDSTX;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
                     vm->st = vx;
                     pd->system->logToConsole("LDSTX at addr:%x",vm->pc);
                 break;
                 case 0x1E:
+                    vm->instrs[vm->pc].instr = ADDIX;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
                     vm->i += vx;
                     pd->system->logToConsole("ADDIX at addr:%x",vm->pc);
                 break;
                 case 0x29:
+                    vm->instrs[vm->pc].instr = LDFX;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
                     vm->i = vx * 5;
                     pd->system->logToConsole("LDFX at addr:%x",vm->pc);
                 break;
                 case 0x33:
+                    vm->instrs[vm->pc].instr = LDBX;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
                     uint16_t i = vm->i;
                     vm->mem[i] = vx / 100;
                     vm->mem[i+1] = (vx/10)%10;
@@ -253,6 +333,8 @@ void exec_op(Chip8*vm, uint16_t op, PlaydateAPI* pd){
                     pd->system->logToConsole("LDBX at addr:%x",vm->pc);
                 break;
                 case 0x55:
+                    vm->instrs[vm->pc].instr = LDIX;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
                     uint16_t i_reg = vm->i;
                     for(int i = 0;i<=x+1; i++)
                         vm->mem[i_reg+i] = vm->v[i];
@@ -260,6 +342,8 @@ void exec_op(Chip8*vm, uint16_t op, PlaydateAPI* pd){
                     pd->system->logToConsole("LDIX at addr:%x",vm->pc);
                 break;
                 case 0x65:
+                    vm->instrs[vm->pc].instr = LDXI;
+                    vm->instrs[vm->pc].ops.xyz.x = x;
                     for(int i = 0;i<=x; i++){
                         uint16_t i_reg = vm->i;
                         vm->v[i] = vm->mem[i_reg+i];
