@@ -31,14 +31,14 @@ typedef enum InstructionOP{
     SKP,
     SKNP,
     LDXDT,
-    LDXKK,
+    LDXKY,
     LDDTX,
     LDSTX,
     ADDIX,
     LDFX,
     LDBX,
     LDIX,
-    LDXI
+    LDXI,
 } InstructionOP;
 typedef struct OperandsXYZ{
     uint8_t x;
@@ -70,4 +70,5 @@ typedef struct Chip8{
 void init_from_file(char* file, Chip8**vm, PlaydateAPI* pd);
 void init_from_header(Chip8**vm, PlaydateAPI* pd);
 void run_frame(Chip8* vm, PlaydateAPI* pd);
+void translate_program(Chip8* vm, PlaydateAPI* pd);
 #endif

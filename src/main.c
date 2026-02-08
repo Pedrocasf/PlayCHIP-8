@@ -25,6 +25,7 @@ int eventHandler(PlaydateAPI* pd, PDSystemEvent event, uint32_t arg)
 	if ( event == kEventInit )
 	{
 	    init_from_header(&VM_state, pd);
+		translate_program(VM_state, pd);
 		bitmap =  pd->graphics->newBitmap(64,32,kColorBlack);
 	    //pd->file->mkdir("/ROMS");
 		pd->system->setUpdateCallback(update, pd);
