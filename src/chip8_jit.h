@@ -31,7 +31,7 @@ typedef enum InstructionOP{
     SKP,
     SKNP,
     LDXDT,
-    LDXKY,
+    LDXKK,
     LDDTX,
     LDSTX,
     ADDIX,
@@ -50,9 +50,14 @@ typedef union Operands{
     OperandsXYZ xyz;
 } Operands;
 typedef struct Instruction{
-    InstructionOP instr;
+    InstructionOP opcode;
     Operands ops;
 } Instruction;
+typedef struct InstructionBlock {
+    uint16_t begin_addr;
+    uint16_t end_addr;
+    Instruction* instrs;
+} InstructionBlock;
 typedef struct Chip8{
     uint8_t v[16];
     uint8_t mem[4096];
@@ -64,7 +69,7 @@ typedef struct Chip8{
     uint16_t i;
     uint8_t disp[256];
     bool fb[2048];
-    Instruction *instrs;
+    InstructionBlock *instr_blk;
 } Chip8;
 
 void init_from_file(char* file, Chip8**vm, PlaydateAPI* pd);
