@@ -31,9 +31,9 @@ set(PLAYDATE_GAME_DEVICE play_chip_8_DEVICE)
 project(${PLAYDATE_GAME_NAME} C ASM)
 
 if (TOOLCHAIN STREQUAL "armgcc")
-	add_executable(${PLAYDATE_GAME_DEVICE} src/main.c src/chip8_jit.c)
+	add_executable(${PLAYDATE_GAME_DEVICE} src/main.c src/chip8.c)
 else()
-	add_library(${PLAYDATE_GAME_NAME} SHARED src/main.c src/chip8_jit.c)
+	add_library(${PLAYDATE_GAME_NAME} SHARED src/main.c src/chip8.c)
 endif()
 
 include(${SDK}/C_API/buildsupport/playdate_game.cmake)
